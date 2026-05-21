@@ -155,7 +155,7 @@ Complete details page
 
 Add loading and error states
 
-Deploy to Vercel / Netlify
+Deploy to Vercel 
 
 Share live URL
 
@@ -189,11 +189,16 @@ Creating smooth user experiences with loading skeletons
 Building for production with error resilience
 
 👩‍💻 Author
-Your Name
+name  ARIKA AHSAN
 
-GitHub: @yourusername
 
-LinkedIn: Your Name
+
+GitHub: ARIKA AHSAN
+arikaahsan107-ui
+
+
+LinkedIn: ARIKA AHSAN
+
 
 📄 License
 MIT License - feel free to use this project for learning and portfolio purposes.
