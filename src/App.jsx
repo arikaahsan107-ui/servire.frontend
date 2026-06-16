@@ -20,6 +20,10 @@ import {
    GLOBAL STYLES  (Dark + Light theme variables)
    IMPROVED TEXT CONTRAST FOR BETTER READABILITY
    ───────────────────────────────────────────── */
+import API from './services/api';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser } from './services/auth.service';
+import { getWorkers, getWorkerById } from './services/worker.service';
+import { createBooking, getUserBookings, cancelBooking } from './services/booking.service';
 const GlobalStyle = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600;700&family=Cinzel:wght@400;600;700&display=swap');
@@ -2149,69 +2153,515 @@ const SmartCityPage=()=>{
 ═══════════════════════════════════════════════════ */
 const pwdStr=p=>{if(!p)return{s:0,label:'',color:'var(--border2)',pct:0};let s=0;if(p.length>=8)s++;if(/[A-Z]/.test(p))s++;if(/\d/.test(p))s++;if(/[@$!%*?&]/.test(p))s++;return{s,label:['','Weak 🔓','Fair 🔑','Good 🔒','Strong 🛡️'][s],color:['','#FF6B8A','#FFAD6B','#5CE0C8','#E8C96A'][s],pct:(s/4)*100};};
 
-const LoginPage=()=>{
-  const{setUser,addToast}=useApp();
-  const navigate=useNavigate();
-  const[email,setEmail]=useState('');
-  const[pwd,setPwd]=useState('');
-  const[errs,setErrs]=useState({});
-  const[loading,setLoading]=useState(false);
-  const[showPwd,setShowPwd]=useState(false);
-  const validate=()=>{const e={};if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))e.email='Valid email required';if(pwd.length<6)e.pwd='Minimum 6 characters';setErrs(e);return!Object.keys(e).length;};
-  const login=async()=>{if(!validate())return;setLoading(true);await new Promise(r=>setTimeout(r,1200));const u={id:'u1',name:email.includes('admin')?'Admin User':email.split('@')[0],email,role:email.includes('admin')?'admin':'user'};setUser(u);addToast(`Welcome back, ${u.name}! 🌊`,'success');navigate(u.role==='admin'?'/admin':'/dashboard');setLoading(false);};
-  return(
+const LoginPage = () => {
+  const { setUser, addToast } = useApp();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [pwd, setPwd] = useState('');
+  const [errs, setErrs] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
+
+  const validate = () => {
+    const e = {};
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      e.email = 'Valid email required';
+    }
+    if (pwd.length < 6) {
+      e.pwd = 'Minimum 6 characters';
+    }
+    setErrs(e);
+    return !Object.keys(e).length;
+  };
+
+  const handleLogin = async () => {
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      // Call login API - passing email and password as separate arguments
+      const result = await apiLogin(email, pwd);
+      
+      if (result.success) {
+        // Set user in context
+        setUser(result.data.user);
+        
+        // Store token if your API returns one
+        if (result.data.token) {
+          localStorage.setItem('token', result.data.token);
+        }
+        
+        addToast(`Welcome back, ${result.data.user.name}! 🌊`, 'success');
+        
+        // Redirect based on role
+        if (result.data.user.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        addToast(result.message || 'Login failed. Please check your credentials.', 'error');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      
+      let errorMsg = 'Login failed. Please try again.';
+      
+      if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMsg = error.response.data.error;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      addToast(errorMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleLogin();
+    }
+  };
+
+  return (
     <PageWrapper>
       <div className="auth-page">
-        <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at 30% 40%,rgba(92,224,200,0.08),transparent 60%)',zIndex:0}}/>
-        <Particles/>
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 30% 40%,rgba(92,224,200,0.08),transparent 60%)', zIndex: 0 }} />
+        <Particles />
         <div className="auth-box">
-          <div className="auth-logo"><span>✦ SERVIRE</span></div>
+          <div className="auth-logo">
+            <span>✦ SERVIRE</span>
+          </div>
           <div className="auth-title">Welcome Back</div>
           <div className="auth-sub">Sign in to continue</div>
-          <div className="form-group"><label className="form-label">Email Address</label><input className={`input ${errs.email?'err':email?'ok':''}`} type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)}/>{errs.email&&<div className="form-error">{errs.email}</div>}</div>
-          <div className="form-group"><label className="form-label">Password</label><div style={{position:'relative'}}><input className={`input ${errs.pwd?'err':''}`} type={showPwd?'text':'password'} placeholder="••••••••" value={pwd} onChange={e=>setPwd(e.target.value)} style={{paddingRight:'2.8rem'}}/><button onClick={()=>setShowPwd(!showPwd)} style={{position:'absolute',right:'0.9rem',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:'1rem'}}>{showPwd?'🙈':'👁️'}</button></div>{errs.pwd&&<div className="form-error">{errs.pwd}</div>}</div>
-          <button className="btn btn-jade w-full mb-3" onClick={login} disabled={loading} style={{justifyContent:'center'}}>{loading?<span style={{animation:'spin 1s linear infinite',display:'inline-block'}}>⏳</span>:'✦ Sign In'}</button>
-          <p style={{textAlign:'center',fontSize:'0.8rem',color:'var(--text2)'}}>No account? <span style={{color:'var(--jade)',fontWeight:700,cursor:'pointer'}} onClick={()=>navigate('/signup')}>Sign up ✦</span></p>
-          <p style={{textAlign:'center',fontSize:'0.68rem',color:'var(--text3)',marginTop:'0.5rem'}}>Tip: Use "admin@servire.pk" for admin access</p>
+          
+          <div className="form-group">
+            <label className="form-label">Email Address</label>
+            <input 
+              className={`input ${errs.email ? 'err' : email ? 'ok' : ''}`} 
+              type="email" 
+              placeholder="you@example.com" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)}
+              onKeyPress={handleKeyPress}
+              autoComplete="email"
+            />
+            {errs.email && <div className="form-error">{errs.email}</div>}
+          </div>
+          
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <div style={{ position: 'relative' }}>
+              <input 
+                className={`input ${errs.pwd ? 'err' : ''}`} 
+                type={showPwd ? 'text' : 'password'} 
+                placeholder="••••••••" 
+                value={pwd} 
+                onChange={e => setPwd(e.target.value)}
+                onKeyPress={handleKeyPress}
+                style={{ paddingRight: '2.8rem' }}
+                autoComplete="current-password"
+              />
+              <button 
+                onClick={() => setShowPwd(!showPwd)} 
+                style={{ 
+                  position: 'absolute', 
+                  right: '0.9rem', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  fontSize: '1rem' 
+                }}
+                type="button"
+                aria-label={showPwd ? 'Hide password' : 'Show password'}
+              >
+                {showPwd ? '🙈' : '👁️'}
+              </button>
+            </div>
+            {errs.pwd && <div className="form-error">{errs.pwd}</div>}
+          </div>
+          
+          <button 
+            className="btn btn-jade w-full mb-3" 
+            onClick={handleLogin} 
+            disabled={loading} 
+            style={{ justifyContent: 'center' }}
+          >
+            {loading ? (
+              <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+            ) : (
+              '✦ Sign In'
+            )}
+          </button>
+          
+          <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text2)' }}>
+            No account? 
+            <span 
+              style={{ color: 'var(--jade)', fontWeight: 700, cursor: 'pointer', marginLeft: '0.25rem' }} 
+              onClick={() => navigate('/signup')}
+            >
+              Sign up ✦
+            </span>
+          </p>
+          
+          <p style={{ textAlign: 'center', fontSize: '0.68rem', color: 'var(--text3)', marginTop: '0.5rem' }}>
+            Demo: user@example.com / any password (min 6 chars)
+          </p>
+          
+          {/* Optional: Forgot Password link */}
+          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+            <span 
+              style={{ fontSize: '0.7rem', color: 'var(--text3)', cursor: 'pointer' }}
+              onClick={() => addToast('Password reset link sent to your email!', 'info')}
+            >
+              Forgot Password?
+            </span>
+          </div>
         </div>
       </div>
     </PageWrapper>
   );
 };
 
-const SignupPage=()=>{
-  const{setUser,addToast}=useApp();
-  const navigate=useNavigate();
-  const[step,setStep]=useState(1);
-  const[role,setRole]=useState('');
-  const[form,setForm]=useState({name:'',email:'',phone:'',password:'',confirm:'',skill:'',experience:'',bio:''});
-  const[errs,setErrs]=useState({});
-  const[loading,setLoading]=useState(false);
-  const[done,setDone]=useState(false);
-  const[showPwd,setShowPwd]=useState(false);
-  const str=pwdStr(form.password);
-  const upd=(k,v)=>setForm(p=>({...p,[k]:v}));
-  const TOTAL=role==='worker'?4:3;
-  const val=()=>{const e={};if(step===1&&!role)e.role='Choose an account type';if(step===2){if(!/^[A-Za-z\s]{2,50}$/.test(form.name))e.name='Valid name required';if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email))e.email='Valid email required';}if(step===3){if(form.password.length<8)e.password='8+ chars required';if(form.password!==form.confirm)e.confirm='Passwords do not match';}if(step===4&&role==='worker'&&!form.skill)e.skill='Select your primary skill';setErrs(e);return!Object.keys(e).length;};
-  const submit=async()=>{if(!val())return;setLoading(true);await new Promise(r=>setTimeout(r,1500));const u={id:'u'+Date.now(),name:form.name,email:form.email,role};setUser(u);setLoading(false);setDone(true);addToast(`Welcome to Servire, ${form.name}! 🌊`,'success');setTimeout(()=>navigate('/dashboard'),2500);};
-  return(
+
+const SignupPage = () => {
+  const { setUser, addToast } = useApp();
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [role, setRole] = useState('');
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirm: '', skill: '', experience: '', bio: '' });
+  const [errs, setErrs] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
+  const str = pwdStr(form.password);
+  const upd = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const TOTAL = role === 'worker' ? 4 : 3;
+
+  const val = () => {
+    const e = {};
+    if (step === 1 && !role) e.role = 'Choose an account type';
+    if (step === 2) {
+      if (!/^[A-Za-z\s]{2,50}$/.test(form.name)) e.name = 'Valid name required (2-50 letters)';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email)) e.email = 'Valid email required';
+      if (form.phone && !/^(\+92|0)?[3-9][0-9]{9}$/.test(form.phone.replace(/\s/g, ''))) e.phone = 'Valid phone number required (e.g., +92 300 1234567)';
+    }
+    if (step === 3) {
+      if (form.password.length < 8) e.password = '8+ characters required';
+      if (form.password !== form.confirm) e.confirm = 'Passwords do not match';
+    }
+    if (step === 4 && role === 'worker' && !form.skill) e.skill = 'Select your primary skill';
+    setErrs(e);
+    return !Object.keys(e).length;
+  };
+
+  const handleSubmit = async () => {
+    if (!val()) return;
+    setLoading(true);
+    try {
+      // Prepare user data for API
+      const userData = {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        phone: form.phone || '',
+        city: 'Lahore',
+        role: role === 'worker' ? 'worker' : 'user',
+      };
+      
+      // Add worker-specific fields
+      if (role === 'worker') {
+        userData.skill = form.skill;
+        userData.experience = parseInt(form.experience) || 1;
+        userData.bio = form.bio || '';
+      }
+      
+      // Call registration API
+      const result = await apiRegister(userData);
+      
+      if (result.success) {
+        // Auto-login after successful registration
+        // Fix: pass email and password as separate arguments, not as object
+        const loginResult = await apiLogin(userData.email, form.password);
+        
+        if (loginResult.success && loginResult.user) {
+          setUser(loginResult.user);
+          // Store token if needed
+          if (loginResult.token) {
+            localStorage.setItem('token', loginResult.token);
+          }
+        }
+        
+        setDone(true);
+        addToast(`Welcome to Servire, ${form.name}! 🌊 Your account has been created.`, 'success');
+        setTimeout(() => navigate('/dashboard'), 2500);
+      } else {
+        addToast(result.message || 'Registration failed. Please try again.', 'error');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      let errorMsg = 'Registration failed. Please check your details and try again.';
+      
+      if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.response?.data?.errors) {
+        // Handle validation errors from backend
+        const validationErrors = Object.values(error.response.data.errors).flat();
+        errorMsg = validationErrors.join(', ');
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      addToast(errorMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const nextStep = () => {
+    if (val()) setStep(s => s + 1);
+  };
+
+  const prevStep = () => setStep(s => s - 1);
+
+  return (
     <PageWrapper>
       <div className="auth-page">
-        <Particles/>
+        <Particles />
         <div className="auth-box">
           <div className="auth-logo"><span>✦ SERVIRE</span></div>
-          {done?(
-            <div style={{textAlign:'center',padding:'1rem 0'}}><div style={{fontSize:'3.5rem',marginBottom:'0.75rem',animation:'scaleIn 0.6s var(--bounce)'}}>🎉</div><div className="auth-title">Welcome, {form.name}!</div><p style={{color:'var(--text2)',marginTop:'0.5rem',fontSize:'0.86rem'}}>Redirecting to your dashboard…</p></div>
-          ):(
+          {done ? (
+            <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+              <div style={{ fontSize: '3.5rem', marginBottom: '0.75rem', animation: 'scaleIn 0.6s var(--bounce)' }}>🎉</div>
+              <div className="auth-title">Welcome, {form.name}!</div>
+              <p style={{ color: 'var(--text2)', marginTop: '0.5rem', fontSize: '0.86rem' }}>Your account has been created. Redirecting to dashboard...</p>
+              <div className="dot-loader mt-4"><span /><span /><span /></div>
+            </div>
+          ) : (
             <>
-              <div className="step-dots">{Array.from({length:TOTAL+1},(_,i)=>(<div key={i} className={`sdot-step ${i+1<step?'done':i+1===step?'active':''}`}/>))}</div>
-              <div className="auth-title" style={{fontSize:'1.4rem'}}>{['','Choose Role','Personal Info','Security','Worker Info'][step]}</div>
-              <div className="auth-sub mb-4">Step {step} of {TOTAL+1}</div>
-              {step===1&&(<><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.85rem',marginBottom:'1rem'}}>{[['user','👤','User','Hire services'],['worker','👷','Worker','Offer services']].map(([v,ic,l,d])=>(<div key={v} onClick={()=>setRole(v)} style={{cursor:'pointer',padding:'1.5rem 0.85rem',textAlign:'center',borderRadius:18,border:`1.5px solid ${role===v?'var(--jade)':'var(--border2)'}`,background:role===v?'rgba(92,224,200,0.1)':'var(--surface)',transition:'all 0.3s var(--bounce)',boxShadow:role===v?'var(--glow-jade)':'none'}}><div style={{fontSize:'2.2rem',marginBottom:'0.45rem'}}>{ic}</div><div style={{fontWeight:700,color:'var(--text)',marginBottom:'0.2rem',fontSize:'0.9rem'}}>{l}</div><div style={{fontSize:'0.7rem',color:'var(--text3)'}}>{d}</div></div>))}</div>{errs.role&&<div className="form-error mb-3">{errs.role}</div>}<button className="btn btn-jade w-full" style={{justifyContent:'center'}} onClick={()=>val()&&setStep(s=>s+1)}>Continue →</button></>)}
-              {step===2&&(<>{[['name','Full Name','Aisha Khan','text'],['email','Email','aisha@gmail.com','email'],['phone','Phone','+92 300 1234567','text']].map(([k,l,ph,t])=>(<div className="form-group" key={k}><label className="form-label">{l}</label><input className={`input ${errs[k]?'err':form[k]?'ok':''}`} type={t} placeholder={ph} value={form[k]} onChange={e=>upd(k,e.target.value)}/>{errs[k]&&<div className="form-error">{errs[k]}</div>}</div>))}<div style={{display:'flex',gap:'0.65rem'}}><button className="btn btn-ghost" style={{flex:1,justifyContent:'center'}} onClick={()=>setStep(s=>s-1)}>← Back</button><button className="btn btn-jade" style={{flex:2,justifyContent:'center'}} onClick={()=>val()&&setStep(s=>s+1)}>Continue →</button></div></>)}
-              {step===3&&(<><div className="form-group"><label className="form-label">Password</label><div style={{position:'relative'}}><input className={`input ${errs.password?'err':form.password?'ok':''}`} type={showPwd?'text':'password'} placeholder="Min 8 chars…" value={form.password} onChange={e=>upd('password',e.target.value)} style={{paddingRight:'2.8rem'}}/><button onClick={()=>setShowPwd(!showPwd)} style={{position:'absolute',right:'0.9rem',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer'}}>{showPwd?'🙈':'👁️'}</button></div>{form.password&&<div><div className="pwd-bar mt-2"><div className="pwd-fill" style={{width:`${str.pct}%`,background:str.color}}/></div><div style={{fontSize:'0.7rem',fontWeight:700,color:str.color,marginTop:4}}>{str.label}</div></div>}{errs.password&&<div className="form-error">{errs.password}</div>}</div><div className="form-group"><label className="form-label">Confirm Password</label><input className={`input ${errs.confirm?'err':form.confirm&&form.confirm===form.password?'ok':''}`} type="password" placeholder="••••••••" value={form.confirm} onChange={e=>upd('confirm',e.target.value)}/>{errs.confirm&&<div className="form-error">{errs.confirm}</div>}</div><div style={{display:'flex',gap:'0.65rem'}}><button className="btn btn-ghost" style={{flex:1,justifyContent:'center'}} onClick={()=>setStep(s=>s-1)}>← Back</button><button className="btn btn-jade" style={{flex:2,justifyContent:'center'}} onClick={role==='worker'?(()=>val()&&setStep(s=>s+1)):submit}>{loading?'⏳ Creating…':role==='worker'?'Continue →':'✦ Create Account'}</button></div></>)}
-              {step===4&&role==='worker'&&(<><div className="form-group"><label className="form-label">Primary Skill</label><select className={`input ${errs.skill?'err':form.skill?'ok':''}`} value={form.skill} onChange={e=>upd('skill',e.target.value)}><option value="">Select your skill…</option>{SKILLS.map(s=><option key={s} value={s}>{s}</option>)}</select>{errs.skill&&<div className="form-error">{errs.skill}</div>}</div><div className="form-group"><label className="form-label">Experience</label><select className="input" value={form.experience} onChange={e=>upd('experience',e.target.value)}><option value="">Select…</option>{['< 1 year','1–2 years','3–5 years','5–10 years','10+ years'].map(e=><option key={e} value={e}>{e}</option>)}</select></div><div className="form-group"><label className="form-label">Brief Bio</label><textarea className="input" style={{minHeight:80}} placeholder="Tell clients about yourself…" value={form.bio} onChange={e=>upd('bio',e.target.value)}/></div><div style={{display:'flex',gap:'0.65rem'}}><button className="btn btn-ghost" style={{flex:1,justifyContent:'center'}} onClick={()=>setStep(s=>s-1)}>← Back</button><button className="btn btn-jade" style={{flex:2,justifyContent:'center'}} onClick={submit}>{loading?'⏳ Creating…':'✦ Join Servire!'}</button></div></>)}
-              <p style={{textAlign:'center',fontSize:'0.78rem',color:'var(--text2)',marginTop:'1rem'}}>Have an account? <span style={{color:'var(--jade)',fontWeight:700,cursor:'pointer'}} onClick={()=>navigate('/login')}>Sign in →</span></p>
+              <div className="step-dots">
+                {Array.from({ length: TOTAL + 1 }, (_, i) => (
+                  <div key={i} className={`sdot-step ${i + 1 < step ? 'done' : i + 1 === step ? 'active' : ''}`} />
+                ))}
+              </div>
+              <div className="auth-title" style={{ fontSize: '1.4rem' }}>
+                {['', 'Choose Role', 'Personal Info', 'Security', 'Worker Info'][step]}
+              </div>
+              <div className="auth-sub mb-4">Step {step} of {TOTAL + 1}</div>
+
+              {/* Step 1: Choose Role */}
+              {step === 1 && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+                    {[
+                      ['user', '👤', 'User', 'Hire services, book professionals'],
+                      ['worker', '👷', 'Worker', 'Offer services, earn money']
+                    ].map(([v, ic, l, d]) => (
+                      <div
+                        key={v}
+                        onClick={() => setRole(v)}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '1.5rem 0.85rem',
+                          textAlign: 'center',
+                          borderRadius: 18,
+                          border: `1.5px solid ${role === v ? 'var(--jade)' : 'var(--border2)'}`,
+                          background: role === v ? 'rgba(92,224,200,0.1)' : 'var(--surface)',
+                          transition: 'all 0.3s var(--bounce)',
+                          boxShadow: role === v ? 'var(--glow-jade)' : 'none'
+                        }}
+                      >
+                        <div style={{ fontSize: '2.2rem', marginBottom: '0.45rem' }}>{ic}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '0.2rem', fontSize: '0.9rem' }}>{l}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text3)' }}>{d}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {errs.role && <div className="form-error mb-3">{errs.role}</div>}
+                  <button className="btn btn-jade w-full" style={{ justifyContent: 'center' }} onClick={nextStep} disabled={!role}>
+                    Continue →
+                  </button>
+                </>
+              )}
+
+              {/* Step 2: Personal Info */}
+              {step === 2 && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Full Name *</label>
+                    <input 
+                      className={`input ${errs.name ? 'err' : form.name ? 'ok' : ''}`} 
+                      type="text" 
+                      placeholder="e.g., Aisha Khan" 
+                      value={form.name} 
+                      onChange={e => upd('name', e.target.value)}
+                    />
+                    {errs.name && <div className="form-error">{errs.name}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email Address *</label>
+                    <input 
+                      className={`input ${errs.email ? 'err' : form.email ? 'ok' : ''}`} 
+                      type="email" 
+                      placeholder="aisha@example.com" 
+                      value={form.email} 
+                      onChange={e => upd('email', e.target.value)}
+                    />
+                    {errs.email && <div className="form-error">{errs.email}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Phone Number</label>
+                    <input 
+                      className={`input ${errs.phone ? 'err' : form.phone ? 'ok' : ''}`} 
+                      type="tel" 
+                      placeholder="+92 300 1234567" 
+                      value={form.phone} 
+                      onChange={e => upd('phone', e.target.value)}
+                    />
+                    {errs.phone && <div className="form-error">{errs.phone}</div>}
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text3)', marginTop: '0.25rem' }}>
+                      Optional, but recommended for faster communication
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.65rem' }}>
+                    <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={prevStep}>
+                      ← Back
+                    </button>
+                    <button className="btn btn-jade" style={{ flex: 2, justifyContent: 'center' }} onClick={nextStep}>
+                      Continue →
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 3: Security (Password) */}
+              {step === 3 && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Password *</label>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        className={`input ${errs.password ? 'err' : form.password ? 'ok' : ''}`} 
+                        type={showPwd ? 'text' : 'password'} 
+                        placeholder="Minimum 8 characters" 
+                        value={form.password} 
+                        onChange={e => upd('password', e.target.value)}
+                        style={{ paddingRight: '2.8rem' }}
+                      />
+                      <button 
+                        onClick={() => setShowPwd(!showPwd)} 
+                        style={{ position: 'absolute', right: '0.9rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}
+                        type="button"
+                      >
+                        {showPwd ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                    {form.password && (
+                      <>
+                        <div className="pwd-bar mt-2">
+                          <div className="pwd-fill" style={{ width: `${str.pct}%`, background: str.color }} />
+                        </div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: str.color, marginTop: 4 }}>{str.label}</div>
+                      </>
+                    )}
+                    {errs.password && <div className="form-error">{errs.password}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Confirm Password *</label>
+                    <input 
+                      className={`input ${errs.confirm ? 'err' : form.confirm && form.confirm === form.password ? 'ok' : ''}`} 
+                      type="password" 
+                      placeholder="••••••••" 
+                      value={form.confirm} 
+                      onChange={e => upd('confirm', e.target.value)}
+                    />
+                    {errs.confirm && <div className="form-error">{errs.confirm}</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.65rem' }}>
+                    <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={prevStep}>
+                      ← Back
+                    </button>
+                    <button 
+                      className="btn btn-jade" 
+                      style={{ flex: 2, justifyContent: 'center' }} 
+                      onClick={role === 'worker' ? nextStep : handleSubmit}
+                      disabled={loading}
+                    >
+                      {loading ? '⏳ Creating Account...' : (role === 'worker' ? 'Continue →' : '✦ Create Account')}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 4: Worker Info (only for workers) */}
+              {step === 4 && role === 'worker' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Primary Skill *</label>
+                    <select 
+                      className={`input ${errs.skill ? 'err' : form.skill ? 'ok' : ''}`} 
+                      value={form.skill} 
+                      onChange={e => upd('skill', e.target.value)}
+                    >
+                      <option value="">Select your primary skill...</option>
+                      {SKILLS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    {errs.skill && <div className="form-error">{errs.skill}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Years of Experience</label>
+                    <select 
+                      className="input" 
+                      value={form.experience} 
+                      onChange={e => upd('experience', e.target.value)}
+                    >
+                      <option value="1">Less than 1 year</option>
+                      <option value="2">1–2 years</option>
+                      <option value="3">3–5 years</option>
+                      <option value="6">6–10 years</option>
+                      <option value="11">10+ years</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Professional Bio</label>
+                    <textarea 
+                      className="input" 
+                      style={{ minHeight: 80, resize: 'vertical' }} 
+                      placeholder="Tell clients about your expertise, experience, and what makes you special..." 
+                      value={form.bio} 
+                      onChange={e => upd('bio', e.target.value)}
+                    />
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text3)', marginTop: '0.25rem' }}>
+                      {form.bio.length}/500 characters
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.65rem' }}>
+                    <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={prevStep}>
+                      ← Back
+                    </button>
+                    <button 
+                      className="btn btn-jade" 
+                      style={{ flex: 2, justifyContent: 'center' }} 
+                      onClick={handleSubmit}
+                      disabled={loading}
+                    >
+                      {loading ? '⏳ Creating Account...' : '✦ Join Servire as a Worker'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text2)', marginTop: '1rem' }}>
+                Already have an account? <span style={{ color: 'var(--jade)', fontWeight: 700, cursor: 'pointer' }} onClick={() => navigate('/login')}>Sign in →</span>
+              </p>
+              <p style={{ textAlign: 'center', fontSize: '0.68rem', color: 'var(--text3)', marginTop: '0.5rem' }}>
+                By signing up, you agree to our Terms of Service and Privacy Policy.
+              </p>
             </>
           )}
         </div>
@@ -2452,6 +2902,14 @@ function App() {
     setFavorites(n);
     return n.includes(id);
   },[favorites,addToast]);
+
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user) {
+      setUser(user);
+    }
+  }, []);
+
   const value = {user,setUser,favorites,toggleFavorite,addToast};
   return (
     <ErrorBoundary>
