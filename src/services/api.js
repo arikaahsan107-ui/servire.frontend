@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// Use environment variable for base URL
+// Use environment variable for base URL (NO /api at the end)
 const API = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL}/api`,
+  baseURL: import.meta.env.VITE_API_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // Important for cookies/sessions
 });
@@ -29,7 +29,8 @@ API.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
-          const response = await API.post('/auth/refresh-token', { refreshToken });
+          // ✅ FIXED: /refresh-token (not /auth/refresh-token)
+          const response = await API.post('/refresh-token', { refreshToken });
           localStorage.setItem('accessToken', response.data.accessToken);
           originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
           return API(originalRequest);

@@ -2,7 +2,8 @@ import API from './api';
 
 export const register = async (userData) => {
   try {
-    const response = await API.post('/auth/register', userData);
+    // ✅ FIXED: /register (not /auth/register)
+    const response = await API.post('/register', userData);
     return response.data;
   } catch (error) {
     // Handle error properly
@@ -21,7 +22,8 @@ export const register = async (userData) => {
 
 export const login = async (email, password) => {
   try {
-    const response = await API.post('/auth/login', { email, password });
+    // ✅ FIXED: /login (not /auth/login)
+    const response = await API.post('/login', { email, password });
     if (response.data.success) {
       // Store tokens and user data
       if (response.data.accessToken) {
@@ -56,9 +58,9 @@ export const logout = () => {
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
   
-  // Optional: Call backend logout
+  // ✅ FIXED: /logout (not /auth/logout)
   try {
-    API.post('/auth/logout');
+    API.post('/logout');
   } catch (error) {
     // Ignore errors on logout
   }
