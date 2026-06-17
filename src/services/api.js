@@ -1,82 +1,48 @@
-import API from './api';
+import axios from 'axios';
 
-export const register = async (userData) => {
-  try {
-    // ✅ Sahi route: /api/auth/register
-    const response = await API.post('/api/auth/register', userData);
-    return response.data;
-  } catch (error) {
-    if (error.response) {
-      return error.response.data;
-    } else if (error.request) {
-      return { success: false, message: 'Network error. Please try again.' };
-    } else {
-      return { success: false, message: error.message || 'Registration failed' };
+// Use environment variable for base URL (NO /api at the end)
+const API = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // Important for cookies/sessions
+});
+
+// Request interceptor - automatically add token to all requests
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-  }
-};
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-export const login = async (email, password) => {
-  try {
-    // ✅ Sahi route: /api/auth/login
-    const response = await API.post('/api/auth/login', { email, password });
-    if (response.data.success) {
-      if (response.data.accessToken) {
-        localStorage.setItem('accessToken', response.data.accessToken);
-      }
-      if (response.data.refreshToken) {
-        localStorage.setItem('refreshToken', response.data.refreshToken);
-      }
-      if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+// Response interceptor - handle token refresh
+API.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const response = await API.post('/api/auth/refresh-token', { refreshToken });
+          localStorage.setItem('accessToken', response.data.accessToken);
+          originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
+          return API(originalRequest);
+        } catch (err) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+        }
       }
     }
-    return response.data;
-  } catch (error) {
-    if (error.response) {
-      return error.response.data;
-    } else if (error.request) {
-      return { success: false, message: 'Network error. Please try again.' };
-    } else {
-      return { success: false, message: error.message || 'Login failed' };
-    }
+    return Promise.reject(error);
   }
-};
+);
 
-export const logout = () => {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
-  try {
-    API.post('/api/auth/logout');
-  } catch (error) {
-    // Ignore errors on logout
-  }
-};
-
-export const getCurrentUser = () => {
-  try {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  } catch (error) {
-    return null;
-  }
-};
-
-export const isAuthenticated = () => {
-  return !!localStorage.getItem('accessToken');
-};
-
-export const getAccessToken = () => {
-  return localStorage.getItem('accessToken');
-};
-
-export const getRefreshToken = () => {
-  return localStorage.getItem('refreshToken');
-};
-
-export const updateUser = (userData) => {
-  if (userData) {
-    localStorage.setItem('user', JSON.stringify(userData));
-  }
-};
+// ✅ YEH LINE IMPORTANT HAI!
+export default API;
