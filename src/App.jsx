@@ -2173,52 +2173,29 @@ const LoginPage = () => {
     setErrs(e);
     return !Object.keys(e).length;
   };
-
-  const handleLogin = async () => {
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      // Call login API - passing email and password as separate arguments
-    const result = await API.post('/api/auth/login', { email, password });
-      
-      if (result.success) {
-        // Set user in context
-        setUser(result.data.user);
-        
-        // Store token if your API returns one
-        if (result.data.token) {
-          localStorage.setItem('token', result.data.token);
-        }
-        
-        addToast(`Welcome back, ${result.data.user.name}! 🌊`, 'success');
-        
-        // Redirect based on role
-        if (result.data.user.role === 'admin') {
-          navigate('/admin');
-        } else {
-          navigate('/dashboard');
-        }
-      } else {
-        addToast(result.message || 'Login failed. Please check your credentials.', 'error');
+const handleLogin = async () => {
+  if (!validate()) return;
+  setLoading(true);
+  try {
+    // ✅ FIXED: password variable sahi karo
+    const result = await API.post('/api/auth/login', { email, password: pwd });
+    
+    if (result.data.success) {
+      setUser(result.data.user);
+      if (result.data.token) {
+        localStorage.setItem('token', result.data.token);
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      
-      let errorMsg = 'Login failed. Please try again.';
-      
-      if (error.response?.data?.message) {
-        errorMsg = error.response.data.message;
-      } else if (error.response?.data?.error) {
-        errorMsg = error.response.data.error;
-      } else if (error.message) {
-        errorMsg = error.message;
-      }
-      
-      addToast(errorMsg, 'error');
-    } finally {
-      setLoading(false);
+      addToast(`Welcome back, ${result.data.user.name}! 🌊`, 'success');
+      navigate('/dashboard');
+    } else {
+      addToast(result.data.message || 'Login failed.', 'error');
     }
-  };
+  } catch (error) {
+    addToast(error.response?.data?.message || 'Login failed. Try again.', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
@@ -2360,68 +2337,54 @@ const SignupPage = () => {
     return !Object.keys(e).length;
   };
 
-  const handleSubmit = async () => {
-    if (!val()) return;
-    setLoading(true);
-    try {
-      // Prepare user data for API
-      const userData = {
-        name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        phone: form.phone || '',
-        city: 'Lahore',
-        role: role === 'worker' ? 'worker' : 'user',
-      };
-      
-      // Add worker-specific fields
-      if (role === 'worker') {
-        userData.skill = form.skill;
-        userData.experience = parseInt(form.experience) || 1;
-        userData.bio = form.bio || '';
-      }
-      
-      // Call registration API
-      const result = await API.post('/api/auth/register', userData);
-      
-      if (result.success) {
-        // Auto-login after successful registration
-        // Fix: pass email and password as separate arguments, not as object
-        const loginResult = await apiLogin(userData.email, form.password);
-        
-        if (loginResult.success && loginResult.user) {
-          setUser(loginResult.user);
-          // Store token if needed
-          if (loginResult.token) {
-            localStorage.setItem('token', loginResult.token);
-          }
-        }
-        
-        setDone(true);
-        addToast(`Welcome to Servire, ${form.name}! 🌊 Your account has been created.`, 'success');
-        setTimeout(() => navigate('/dashboard'), 2500);
-      } else {
-        addToast(result.message || 'Registration failed. Please try again.', 'error');
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      let errorMsg = 'Registration failed. Please check your details and try again.';
-      
-      if (error.response?.data?.message) {
-        errorMsg = error.response.data.message;
-      } else if (error.response?.data?.errors) {
-        // Handle validation errors from backend
-        const validationErrors = Object.values(error.response.data.errors).flat();
-        errorMsg = validationErrors.join(', ');
-      } else if (error.message) {
-        errorMsg = error.message;
-      }
-      
-      addToast(errorMsg, 'error');
-    } finally {
-      setLoading(false);
+ const handleSubmit = async () => {
+  if (!val()) return;
+  setLoading(true);
+  try {
+    const userData = {
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+      phone: form.phone || '',
+      city: 'Lahore',
+      role: role === 'worker' ? 'worker' : 'user',
+    };
+    
+    if (role === 'worker') {
+      userData.skill = form.skill;
+      userData.experience = parseInt(form.experience) || 1;
+      userData.bio = form.bio || '';
     }
-  };
+    
+    // ✅ Register call
+    const result = await API.post('/api/auth/register', userData);
+    
+    if (result.data.success) {
+      // ✅ Login call with correct password
+      const loginResult = await API.post('/api/auth/login', { 
+        email: userData.email, 
+        password: form.password 
+      });
+      
+      if (loginResult.data.success && loginResult.data.user) {
+        setUser(loginResult.data.user);
+        if (loginResult.data.token) {
+          localStorage.setItem('token', loginResult.data.token);
+        }
+      }
+      
+      setDone(true);
+      addToast(`Welcome to Servire, ${form.name}! 🌊`, 'success');
+      setTimeout(() => navigate('/dashboard'), 2500);
+    } else {
+      addToast(result.data.message || 'Registration failed.', 'error');
+    }
+  } catch (error) {
+    addToast(error.response?.data?.message || 'Registration failed. Try again.', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const nextStep = () => {
     if (val()) setStep(s => s + 1);
