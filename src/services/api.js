@@ -1,8 +1,10 @@
 import axios from 'axios';
 
+// Use environment variable for base URL
 const API = axios.create({
-baseURL: `${import.meta.env.VITE_API_URL}/api`,
-  headers: { 'Content-Type': 'application/json' }
+  baseURL: `${import.meta.env.VITE_API_URL}/api`,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // Important for cookies/sessions
 });
 
 // Request interceptor - automatically add token to all requests
@@ -32,6 +34,8 @@ API.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
           return API(originalRequest);
         } catch (err) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
           window.location.href = '/login';
         }
       }
