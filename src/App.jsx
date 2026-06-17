@@ -2179,7 +2179,7 @@ const LoginPage = () => {
     setLoading(true);
     try {
       // Call login API - passing email and password as separate arguments
-      const result = await API.post('/auth/login', { email, password });
+    const result = await API.post('/api/auth/login', { email, password });
       
       if (result.success) {
         // Set user in context
@@ -2382,7 +2382,7 @@ const SignupPage = () => {
       }
       
       // Call registration API
-      const result = await API.post('/auth/register', userData);
+      const result = await API.post('/api/auth/register', userData);
       
       if (result.success) {
         // Auto-login after successful registration

@@ -2,19 +2,15 @@ import API from './api';
 
 export const register = async (userData) => {
   try {
-    // ✅ FIXED: /register (not /auth/register)
-    const response = await API.post('/register', userData);
+    // ✅ SAHI: /api/auth/register
+    const response = await API.post('/api/auth/register', userData);
     return response.data;
   } catch (error) {
-    // Handle error properly
     if (error.response) {
-      // Server responded with error
       return error.response.data;
     } else if (error.request) {
-      // Request made but no response
       return { success: false, message: 'Network error. Please try again.' };
     } else {
-      // Something else happened
       return { success: false, message: error.message || 'Registration failed' };
     }
   }
@@ -22,10 +18,9 @@ export const register = async (userData) => {
 
 export const login = async (email, password) => {
   try {
-    // ✅ FIXED: /login (not /auth/login)
-    const response = await API.post('/login', { email, password });
+    // ✅ SAHI: /api/auth/login
+    const response = await API.post('/api/auth/login', { email, password });
     if (response.data.success) {
-      // Store tokens and user data
       if (response.data.accessToken) {
         localStorage.setItem('accessToken', response.data.accessToken);
       }
@@ -38,29 +33,24 @@ export const login = async (email, password) => {
     }
     return response.data;
   } catch (error) {
-    // Handle error properly
     if (error.response) {
-      // Server responded with error
       return error.response.data;
     } else if (error.request) {
-      // Request made but no response
       return { success: false, message: 'Network error. Please try again.' };
     } else {
-      // Something else happened
       return { success: false, message: error.message || 'Login failed' };
     }
   }
 };
 
 export const logout = () => {
-  // Clear all stored data
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
   
-  // ✅ FIXED: /logout (not /auth/logout)
+  // ✅ SAHI: /api/auth/logout
   try {
-    API.post('/logout');
+    API.post('/api/auth/logout');
   } catch (error) {
     // Ignore errors on logout
   }
@@ -87,7 +77,6 @@ export const getRefreshToken = () => {
   return localStorage.getItem('refreshToken');
 };
 
-// Helper function to update user data in localStorage
 export const updateUser = (userData) => {
   if (userData) {
     localStorage.setItem('user', JSON.stringify(userData));
